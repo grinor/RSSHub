@@ -12,14 +12,16 @@ export const renderItems = (items) =>
         let description: string;
         switch (productType) {
             case 'carousel_container': {
-                const images = item.carousel_media.map((i) => ({
-                    ...i.image_versions2.candidates.toSorted((a, b) => b.width - a.width)[0],
-                    alt: item.accessibility_caption,
-                }));
-                description = renderImages({
-                    summary,
-                    images,
-                });
+                description = item.carousel_media
+                    .map((media, index) => {
+                        const image = media.image_versions2.candidates.toSorted((a, b) => b.width - a.width)[0];
+                        const video = media.video_versions?.[0] ?? (media.video_url ? { url: media.video_url, width: media.original_width } : undefined);
+                        const mediaSummary = index === 0 ? summary : '';
+                        return media.media_type === 2 && video?.url
+                            ? renderVideo({ summary: mediaSummary, image: image.url, video })
+                            : renderImages({ summary: mediaSummary, images: [{ ...image, alt: item.accessibility_caption }] });
+                    })
+                    .join('<br>');
                 break;
             }
             case 'clips':

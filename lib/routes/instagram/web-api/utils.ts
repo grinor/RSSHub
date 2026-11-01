@@ -121,6 +121,33 @@ const getGuestUser = (html: string) => {
         .find((user) => user?.full_name !== undefined);
 };
 
+const findCarouselMedia = (value: JsonValue, code: string): JsonValue[] | undefined => {
+    if (!isJsonContainer(value)) {
+        return;
+    }
+    const record = value as JsonObject;
+    if (record.code === code && Array.isArray(record.carousel_media)) {
+        return record.carousel_media;
+    }
+    for (const child of Object.values(record)) {
+        const media = findCarouselMedia(child, code);
+        if (media) {
+            return media;
+        }
+    }
+};
+
+const getGuestCarouselMedia = async (code: string, cookieJar: CookieJar) => {
+    const { html } = await getSessionPage(`${baseUrl}/p/${code}/`, cookieJar);
+    const $ = load(html);
+    return (
+        $('script[type="application/json"][data-sjs]')
+            .toArray()
+            .map((script) => findCarouselMedia(JSON.parse($(script).text()), code))
+            .find((media) => media?.length) ?? []
+    );
+};
+
 export const getSessionPage = async (link: string, cookieJar: CookieJar) => {
     const page = await ofetch.raw(link, {
         headers: {
@@ -191,15 +218,47 @@ export const getUserFeed = (username: string, cookieJar: CookieJar, page: () => 
             if (!tokens.dtsg) {
                 const user = getGuestUser(html);
                 const timeline = await graphql('PolarisLoggedOutDesktopWWWProfilePostsTabContentQuery_connection', { first: 33, id: user.id, __relay_internal__pv__PolarisSEOIsCrawlerrelayprovider: false }, tokens, cookieJar);
-                return timeline.node.polaris_ordered_timeline_connection.edges
+                const nodes = timeline.node.polaris_ordered_timeline_connection.edges
                     .map((edge) => edge.node)
-                    .filter((node) => node.user.id === user.id)
-                    .map((node) => {
+                    .filter((node) => node.user.id === user.id);
+                const carouselMediaByNode = await Promise.all(
+                    nodes.map(async (node) => {
+                        const embeddedMedia = node.carousel_media ?? node.edge_sidecar_to_children?.edges?.map((edge) => edge.node) ?? node.edge_media_to_children?.edges?.map((edge) => edge.node) ?? [];
+                        if (embeddedMedia.length || node.media_type !== 8 || !node.code) {
+                            return embeddedMedia;
+                        }
+                        try {
+                            return await getGuestCarouselMedia(node.code, cookieJar);
+                        } catch {
+                            return [];
+                        }
+                    })
+                );
+                return nodes.map((node, index) => {
+                        const children = carouselMediaByNode[index];
+                        const imageCandidates = (media) => {
+                            const candidates = media.image_versions2?.candidates;
+                            if (candidates?.length) {
+                                return candidates;
+                            }
+
+                            const url = media.display_uri ?? media.display_url ?? media.thumbnail_src;
+                            return url ? [{ url }] : [];
+                        };
+                        const carouselMedia = children
+                            .map((media) => ({
+                                ...media,
+                                image_versions2: {
+                                    candidates: imageCandidates(media),
+                                },
+                            }))
+                            .filter((media) => media.image_versions2.candidates.length > 0);
                         const date = node.accessibility_caption?.match(/ on ([A-Z][a-z]+ \d{1,2}, \d{4})\./)?.[1];
                         return {
                             ...node,
-                            product_type: 'feed',
-                            image_versions2: { candidates: [{ url: node.display_uri }] },
+                            product_type: carouselMedia.length > 1 ? 'carousel_container' : 'feed',
+                            carousel_media: carouselMedia,
+                            image_versions2: { candidates: imageCandidates(node) },
                             taken_at: date && parseDate(date, 'MMMM D, YYYY').getTime() / 1000,
                         };
                     });
