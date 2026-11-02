@@ -41,7 +41,7 @@ jobs:
           build-args: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:vps-latest
-            ghcr.io/${{ github.repository }}:vps-${{ github.sha }}
+            ghcr.io/grinor/rsshub:vps-latest
+            ghcr.io/grinor/rsshub:vps-${{ github.sha }}
           cache-from: type=gha,scope=rsshub-vps-amd64
           cache-to: type=gha,mode=max,scope=rsshub-vps-amd64
