@@ -218,9 +218,7 @@ export const getUserFeed = (username: string, cookieJar: CookieJar, page: () => 
             if (!tokens.dtsg) {
                 const user = getGuestUser(html);
                 const timeline = await graphql('PolarisLoggedOutDesktopWWWProfilePostsTabContentQuery_connection', { first: 33, id: user.id, __relay_internal__pv__PolarisSEOIsCrawlerrelayprovider: false }, tokens, cookieJar);
-                const nodes = timeline.node.polaris_ordered_timeline_connection.edges
-                    .map((edge) => edge.node)
-                    .filter((node) => node.user.id === user.id);
+                const nodes = timeline.node.polaris_ordered_timeline_connection.edges.map((edge) => edge.node).filter((node) => node.user.id === user.id);
                 const carouselMediaByNode = await Promise.all(
                     nodes.map(async (node) => {
                         const embeddedMedia = node.carousel_media ?? node.edge_sidecar_to_children?.edges?.map((edge) => edge.node) ?? node.edge_media_to_children?.edges?.map((edge) => edge.node) ?? [];
@@ -235,33 +233,33 @@ export const getUserFeed = (username: string, cookieJar: CookieJar, page: () => 
                     })
                 );
                 return nodes.map((node, index) => {
-                        const children = carouselMediaByNode[index];
-                        const imageCandidates = (media) => {
-                            const candidates = media.image_versions2?.candidates;
-                            if (candidates?.length) {
-                                return candidates;
-                            }
+                    const children = carouselMediaByNode[index];
+                    const imageCandidates = (media) => {
+                        const candidates = media.image_versions2?.candidates;
+                        if (candidates?.length) {
+                            return candidates;
+                        }
 
-                            const url = media.display_uri ?? media.display_url ?? media.thumbnail_src;
-                            return url ? [{ url }] : [];
-                        };
-                        const carouselMedia = children
-                            .map((media) => ({
-                                ...media,
-                                image_versions2: {
-                                    candidates: imageCandidates(media),
-                                },
-                            }))
-                            .filter((media) => media.image_versions2.candidates.length > 0);
-                        const date = node.accessibility_caption?.match(/ on ([A-Z][a-z]+ \d{1,2}, \d{4})\./)?.[1];
-                        return {
-                            ...node,
-                            product_type: carouselMedia.length > 1 ? 'carousel_container' : 'feed',
-                            carousel_media: carouselMedia,
-                            image_versions2: { candidates: imageCandidates(node) },
-                            taken_at: date && parseDate(date, 'MMMM D, YYYY').getTime() / 1000,
-                        };
-                    });
+                        const url = media.display_uri ?? media.display_url ?? media.thumbnail_src;
+                        return url ? [{ url }] : [];
+                    };
+                    const carouselMedia = children
+                        .map((media) => ({
+                            ...media,
+                            image_versions2: {
+                                candidates: imageCandidates(media),
+                            },
+                        }))
+                        .filter((media) => media.image_versions2.candidates.length > 0);
+                    const date = node.accessibility_caption?.match(/ on ([A-Z][a-z]+ \d{1,2}, \d{4})\./)?.[1];
+                    return {
+                        ...node,
+                        product_type: carouselMedia.length > 1 ? 'carousel_container' : 'feed',
+                        carousel_media: carouselMedia,
+                        image_versions2: { candidates: imageCandidates(node) },
+                        taken_at: date && parseDate(date, 'MMMM D, YYYY').getTime() / 1000,
+                    };
+                });
             }
             const posts = await graphql(
                 'PolarisProfilePostsQuery',
