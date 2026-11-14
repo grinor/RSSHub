@@ -105349,6 +105349,38 @@ export default {
     "url": "rebase.network",
     "lang": "en"
   },
+  "recent-design": {
+    "routes": {
+      "/": {
+        "path": "/",
+        "categories": [
+          "design"
+        ],
+        "example": "/recent-design",
+        "name": "All Recent",
+        "maintainers": [
+          "grinor"
+        ],
+        "radar": [
+          {
+            "source": [
+              "recent.design"
+            ],
+            "target": "/"
+          }
+        ],
+        "location": "index.tsx",
+        "module": () => import('@/routes/recent-design/index.tsx')
+      }
+    },
+    "apiRoutes": {},
+    "name": "Recent",
+    "url": "recent.design",
+    "categories": [
+      "design"
+    ],
+    "lang": "en"
+  },
   "reinet": {
     "routes": {
       "/publications": {
